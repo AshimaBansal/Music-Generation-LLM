@@ -1,10 +1,6 @@
 #!/usr/bin/env python
 
-"""
-Notation Module
-==============
-Sheet music generation and PDF/SVG/PNG export functionality.
-"""
+"""Sheet music generation and notation export."""
 
 from .sheet_music import (
     json_to_music21_score,

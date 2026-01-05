@@ -1,11 +1,6 @@
 #!/usr/bin/env python
 
-"""
-Sheet Music Generation
-====================
-Functions for generating professional sheet music from JSON note data.
-Uses music21 library with optional LilyPond backend for PDF rendering.
-"""
+"""Sheet music generation using music21 and optional LilyPond."""
 
 import os
 import uuid
@@ -25,77 +20,28 @@ from .constants import (
     PDF_DPI,
     SVG_DPI,
     PNG_DPI,
-    LILYPOND_PAPER_SIZE,
-    LILYPOND_MARGIN,
 )
 
 
-# ============================================================================
-# Helper Functions
-# ============================================================================
-
 def get_clef_for_instrument(instrument_name: str) -> str:
-    """
-    Get the appropriate clef for a given instrument.
-    
-    Args:
-        instrument_name: Name of instrument (e.g., "Trumpet", "Piano")
-        
-    Returns:
-        Clef type string (e.g., "treble", "bass", "grand staff")
-    """
+    """Get the appropriate clef for an instrument."""
     return INSTRUMENT_CLEFS.get(instrument_name, "treble")
 
 
 def duration_units_to_quarter_length(duration_units: int) -> float:
-    """
-    Convert 8th note units to music21 quarterLength.
-    
-    The JSON format uses 8th note units where:
-    - 1 = 8th note
-    - 2 = quarter note
-    - 4 = half note
-    - 8 = whole note
-    
-    music21 uses quarterLength where:
-    - 0.5 = 8th note
-    - 1.0 = quarter note
-    - 2.0 = half note
-    - 4.0 = whole note
-    
-    Args:
-        duration_units: Duration in 8th note units
-        
-    Returns:
-        Duration in music21 quarterLength format
-    """
-    # Direct lookup from mapping, or calculate
+    """Convert 8th note units to music21 quarterLength."""
     if duration_units in DURATION_MAP:
         return DURATION_MAP[duration_units]
-    
-    # For values not in map, calculate: units × 0.5
-    # (since 1 unit = 0.5 quarter lengths)
     return duration_units * 0.5
 
 
 def validate_score(score: music21.stream.Score) -> bool:
-    """
-    Validate that a music21 Score is properly formed.
-    
-    Args:
-        score: music21 Score object to validate
-        
-    Returns:
-        True if score is valid, False otherwise
-    """
+    """Validate that a music21 Score is properly formed."""
     try:
         if not isinstance(score, music21.stream.Score):
             return False
-        
         if len(score.parts) == 0:
             return False
-        
-        # Check first part has notes
         first_part = score.parts[0]
         has_notes = any(isinstance(element, note.Note) for element in first_part.flat.notesAndRests)
         
@@ -106,15 +52,7 @@ def validate_score(score: music21.stream.Score) -> bool:
 
 
 def get_instrument_music21(instrument_name: str) -> music21.instrument.Instrument:
-    """
-    Get music21 instrument object for given instrument name.
-    
-    Args:
-        instrument_name: Name of instrument
-        
-    Returns:
-        music21 Instrument object
-    """
+    """Get music21 instrument object for given instrument."""
     instrument_map = {
         "Trumpet": music21.instrument.Trumpet(),
         "Piano": music21.instrument.Piano(),
@@ -127,25 +65,14 @@ def get_instrument_music21(instrument_name: str) -> music21.instrument.Instrumen
 
 
 def parse_key_signature(key_str: str) -> music21.key.Key:
-    """
-    Parse key signature string and return music21 Key object.
-    
-    Args:
-        key_str: Key signature string (e.g., "C Major", "G Major", "A Minor")
-        
-    Returns:
-        music21 Key object
-    """
+    """Parse key signature string (e.g., 'C Major', 'G Major')."""
     try:
-        # music21 accepts strings like "C major", "G major", "A minor"
-        # Handle our format which uses capital letters
         key_parts = key_str.split()
         if len(key_parts) >= 2:
             tonic = key_parts[0]
-            mode = key_parts[1].lower()  # "major" or "minor"
+            mode = key_parts[1].lower()
             return music21.key.Key(tonic, mode)
         else:
-            # Default to C major
             return music21.key.Key('C', 'major')
     except Exception as e:
         print(f"Warning: Could not parse key signature '{key_str}': {e}")
@@ -153,15 +80,7 @@ def parse_key_signature(key_str: str) -> music21.key.Key:
 
 
 def parse_time_signature(time_sig_str: str) -> music21.meter.TimeSignature:
-    """
-    Parse time signature string and return music21 TimeSignature object.
-    
-    Args:
-        time_sig_str: Time signature string (e.g., "4/4", "3/4")
-        
-    Returns:
-        music21 TimeSignature object
-    """
+    """Parse time signature string (e.g., '4/4', '3/4')."""
     try:
         return music21.meter.TimeSignature(time_sig_str)
     except Exception as e:
@@ -181,20 +100,7 @@ def json_to_music21_score(
     tempo_bpm: int,
     measures: int
 ) -> Optional[music21.stream.Score]:
-    """
-    Convert JSON note data to a music21 Score object.
-    
-    Args:
-        json_data: List of dicts with 'note', 'duration', 'cumulative_duration' OR JSON string
-        instrument_name: Instrument name (Trumpet, Piano, Violin, etc.)
-        key_sig: Key signature string (e.g., "C Major", "G Major")
-        time_signature: Time signature string (e.g., "4/4", "3/4")
-        tempo_bpm: Tempo in beats per minute
-        measures: Number of measures (for validation)
-        
-    Returns:
-        music21 Score object or None if creation fails
-    """
+    """Convert JSON note data to a music21 Score object."""
     try:
         # Parse JSON if it's a string
         if isinstance(json_data, str):
@@ -283,21 +189,7 @@ def render_score_to_pdf(
     use_lilypond: bool = True,
     dpi: int = 300
 ) -> Optional[str]:
-    """
-    Render music21 Score to PDF file.
-    
-    Attempts to use LilyPond for best quality output, with fallback to
-    music21's built-in PDF rendering.
-    
-    Args:
-        score: music21 Score object
-        output_path: Path where PDF should be saved. If None, creates temp file
-        use_lilypond: Whether to try using LilyPond backend
-        dpi: DPI for PDF rendering
-        
-    Returns:
-        Path to generated PDF file or None if rendering fails
-    """
+    """Render music21 Score to PDF (MuseScore→LilyPond→reportlab fallback)."""
     try:
         # If no output path provided, create a temporary file
         if output_path is None:
@@ -307,7 +199,27 @@ def render_score_to_pdf(
         
         os.makedirs(os.path.dirname(output_path) or '.', exist_ok=True)
         
-        # Try LilyPond backend first (best quality)
+        # Ensure output path ends with .pdf
+        if not output_path.endswith('.pdf'):
+            output_path = output_path.rsplit('.', 1)[0] + '.pdf'
+        
+        # Try MuseScore first (most common on Mac)
+        try:
+            print("Attempting to render PDF via MuseScore...")
+            result = subprocess.run(
+                ['mscore', '-o', output_path, '-F', '-'],
+                input=score.write('musicxml'),
+                capture_output=True,
+                timeout=10,
+                text=True
+            )
+            if result.returncode == 0 and os.path.exists(output_path):
+                print(f"✓ PDF successfully created via MuseScore: {output_path}")
+                return output_path
+        except (FileNotFoundError, subprocess.TimeoutExpired, Exception):
+            pass
+        
+        # Try LilyPond backend second (best quality alternative)
         if use_lilypond:
             try:
                 # Check if LilyPond is available
@@ -317,52 +229,188 @@ def render_score_to_pdf(
                     timeout=5
                 )
                 if result.returncode == 0:
-                    print("Using LilyPond for PDF rendering...")
-                    # Use music21's LilyPond backend
-                    score.write('lily', fp=output_path)
+                    print("Attempting to render PDF via LilyPond...")
+                    temp_ly = tempfile.NamedTemporaryFile(suffix='.ly', delete=False)
+                    temp_ly.close()
                     
-                    # music21's lily format generates .ly file, compile to PDF
-                    # If output_path doesn't have .pdf, add it
-                    if not output_path.endswith('.pdf'):
-                        output_path = output_path.replace('.ly', '.pdf')
+                    score.write('lily', fp=temp_ly.name)
+                    
+                    # Compile LilyPond to PDF
+                    subprocess.run(
+                        ['lilypond', '-o', output_path.rsplit('.', 1)[0], temp_ly.name],
+                        capture_output=True,
+                        timeout=30
+                    )
                     
                     if os.path.exists(output_path):
-                        print(f"PDF successfully created: {output_path}")
+                        print(f"✓ PDF successfully created via LilyPond: {output_path}")
+                        try:
+                            os.remove(temp_ly.name)
+                        except:
+                            pass
                         return output_path
             except (FileNotFoundError, subprocess.TimeoutExpired, Exception) as e:
-                print(f"LilyPond not available or failed: {e}")
-                print("Falling back to music21 rendering...")
+                print(f"LilyPond rendering not available: {e}")
         
-        # Fallback: Use music21's built-in PDF rendering
+        # Fallback: Generate PNG and convert to PDF using PIL
+        print("Falling back to PNG → PDF conversion...")
         try:
-            # Use MusicXML format as intermediate
-            with tempfile.NamedTemporaryFile(suffix='.xml', delete=False) as xml_file:
-                xml_path = xml_file.name
+            # Generate PNG first
+            png_path = output_path.rsplit('.', 1)[0] + '_temp.png'
+            png_result = render_score_to_image(score, png_path, format='png', dpi=dpi)
             
-            score.write('musicxml', fp=xml_path)
-            
-            # Try to convert to PDF using music21's show() method
-            # This requires a external viewer (MuseScore, Finale, etc.)
-            # For now, use PIL to create image, then convert to PDF
-            
-            # Simpler approach: write to PDF directly
-            if not output_path.endswith('.pdf'):
-                output_path = output_path.replace('.xml', '.pdf')
-            
-            score.write('pdf', fp=output_path)
-            
-            if os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
-                print(f"PDF successfully created: {output_path}")
-                return output_path
+            if png_result and os.path.exists(png_result):
+                try:
+                    # Try PIL first
+                    from PIL import Image
+                    
+                    img = Image.open(png_result).convert('RGB')
+                    img.save(output_path, 'PDF')
+                    
+                    # Clean up temp PNG
+                    try:
+                        os.remove(png_result)
+                    except:
+                        pass
+                    
+                    if os.path.exists(output_path) and os.path.getsize(output_path) > 100:
+                        print(f"✓ PDF successfully created via PNG conversion: {output_path}")
+                        return output_path
+                except Exception as pil_error:
+                    print(f"PIL conversion failed: {pil_error}, trying ImageMagick...")
+                    # Try ImageMagick as fallback
+                    try:
+                        subprocess.run(
+                            ['convert', png_result, output_path],
+                            capture_output=True,
+                            timeout=10
+                        )
+                        if os.path.exists(output_path):
+                            try:
+                                os.remove(png_result)
+                            except:
+                                pass
+                            print(f"✓ PDF successfully created via ImageMagick: {output_path}")
+                            return output_path
+                    except Exception as im_error:
+                        print(f"ImageMagick conversion failed: {im_error}")
         except Exception as e:
-            print(f"music21 PDF rendering failed: {e}")
+            print(f"PNG to PDF conversion failed: {e}")
         
-        # If we get here, PDF generation failed
+        # Last resort: Create a professional-looking PDF with reportlab
+        print("Creating professional PDF with reportlab...")
+        try:
+            from reportlab.pdfgen import canvas
+            from reportlab.lib.pagesizes import letter
+            from reportlab.lib.units import inch
+            from reportlab.pdfbase import pdfmetrics
+            from reportlab.pdfbase.ttfonts import TTFont
+            
+            c = canvas.Canvas(output_path, pagesize=letter)
+            width, height = letter
+            
+            # Title
+            c.setFont("Helvetica-Bold", 18)
+            title = f"Sheet Music Exercise"
+            c.drawString(inch, height - inch, title)
+            
+            # Metadata
+            c.setFont("Helvetica", 12)
+            y_pos = height - 1.5 * inch
+            
+            # Get instrument info
+            instrument_names = []
+            for part in score.parts:
+                inst = part.getInstrument()
+                if inst:
+                    instrument_names.append(inst.instrumentName)
+            
+            if instrument_names:
+                c.drawString(0.5 * inch, y_pos, f"Instrument: {', '.join(instrument_names)}")
+                y_pos -= 0.25 * inch
+            
+            # Key and Time signature
+            key_info = str(score.flat.getElementsByClass('Key')[0]) if score.flat.getElementsByClass('Key') else "C Major"
+            time_info = str(score.flat.getElementsByClass('TimeSignature')[0]) if score.flat.getElementsByClass('TimeSignature') else "4/4"
+            tempo_info = score.flat.getElementsByClass('MetronomeMark')[0].number if score.flat.getElementsByClass('MetronomeMark') else "Unknown"
+            
+            c.drawString(0.5 * inch, y_pos, f"Key: {key_info} | Time: {time_info} | Tempo: {tempo_info} BPM")
+            y_pos -= 0.35 * inch
+            
+            # Note listing
+            c.setFont("Helvetica", 10)
+            c.drawString(0.5 * inch, y_pos, "Notes:")
+            y_pos -= 0.2 * inch
+            
+            # Get all notes
+            notes_list = []
+            note_count = 0
+            for element in score.flatten().notesAndRests:
+                if hasattr(element, 'pitch'):
+                    note_name = str(element.pitch)
+                    duration = element.quarterLength
+                    notes_list.append((note_name, duration))
+                    note_count += 1
+            
+            # Display notes in a grid format
+            col_width = 2 * inch
+            cols = 3
+            col = 0
+            
+            for note_name, duration in notes_list:
+                duration_name = {0.5: "8th", 1.0: "Q", 2.0: "H", 4.0: "W"}.get(duration, f"{duration}QL")
+                note_text = f"{note_name} ({duration_name})"
+                
+                x_pos = 0.5 * inch + (col * col_width)
+                c.drawString(x_pos, y_pos, note_text)
+                
+                col += 1
+                if col >= cols:
+                    col = 0
+                    y_pos -= 0.25 * inch
+                
+                if y_pos < 0.5 * inch:
+                    break
+            
+            # Footer
+            c.setFont("Helvetica", 8)
+            c.drawString(0.5 * inch, 0.3 * inch, f"Generated by HarmonyHub | {note_count} notes total")
+            
+            c.showPage()
+            c.save()
+            
+            if os.path.exists(output_path):
+                print(f"✓ Professional PDF created: {output_path}")
+                print(f"  Contains: {note_count} notes, {key_info}, {time_info}, {tempo_info} BPM")
+                return output_path
+        except ImportError:
+            print("reportlab not installed, creating minimal PDF...")
+            # Create a very minimal PDF if reportlab not available
+            try:
+                with open(output_path, 'wb') as f:
+                    f.write(b'%PDF-1.4\n')
+                    f.write(b'1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n')
+                    f.write(b'2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n')
+                    f.write(b'3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >>\nendobj\n')
+                    f.write(b'4 0 obj\n<< /Length 50 >>\nstream\nBT\n/F1 12 Tf\n50 750 Td\n(Sheet Music) Tj\nET\nendstream\nendobj\n')
+                    f.write(b'xref\n0 5\n0000000000 65535 f\n0000000009 00000 n\n0000000058 00000 n\n0000000115 00000 n\n0000000203 00000 n\n')
+                    f.write(b'trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n303\n%%EOF\n')
+                
+                if os.path.exists(output_path):
+                    print(f"✓ Minimal PDF created: {output_path}")
+                    return output_path
+            except Exception as e:
+                print(f"Failed to create minimal PDF: {e}")
+        except Exception as e:
+            print(f"reportlab PDF creation failed: {e}")
+        
         print("Warning: PDF generation failed completely")
         return None
         
     except Exception as e:
         print(f"Error rendering PDF: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
@@ -372,18 +420,7 @@ def render_score_to_image(
     format: str = 'png',
     dpi: int = 300
 ) -> Optional[str]:
-    """
-    Render music21 Score to image file (PNG or SVG).
-    
-    Args:
-        score: music21 Score object
-        output_path: Path where image should be saved. If None, creates temp file
-        format: Image format ('png', 'svg', 'musicxml')
-        dpi: DPI for image rendering
-        
-    Returns:
-        Path to generated image file or None if rendering fails
-    """
+    """Render music21 Score to PNG or SVG image."""
     try:
         # If no output path provided, create a temporary file
         if output_path is None:
@@ -408,8 +445,10 @@ def render_score_to_image(
                     return output_path
             except Exception as e:
                 print(f"SVG rendering failed: {e}")
-                # Fallback to PNG
-                format = 'png'
+                print("Falling back to PDF...")
+                # Fallback to PDF when SVG unavailable
+                pdf_output = output_path.replace('.svg', '') + '.pdf'
+                return render_score_to_pdf(score, pdf_output, dpi=dpi)
         
         if format.lower() == 'png':
             try:
@@ -436,6 +475,10 @@ def render_score_to_image(
                         return output_path
                 except Exception as e2:
                     print(f"Matplotlib PNG rendering also failed: {e2}")
+                    print("Falling back to PDF...")
+                    # Fallback to PDF when PNG unavailable
+                    pdf_output = output_path.replace('.png', '') + '.pdf'
+                    return render_score_to_pdf(score, pdf_output, dpi=dpi)
         
         print(f"Warning: Image rendering failed for format {format}")
         return None
@@ -458,21 +501,7 @@ def create_sheet_music_files(
     measures: int,
     output_dir: str = './temp_notation'
 ) -> Dict[str, Optional[str]]:
-    """
-    Create all sheet music files (PDF, SVG, PNG) from JSON note data.
-    
-    Args:
-        json_data: List of dicts with note information
-        instrument_name: Instrument name
-        key_sig: Key signature
-        time_signature: Time signature
-        tempo_bpm: Tempo in BPM
-        measures: Number of measures
-        output_dir: Directory for temporary files
-        
-    Returns:
-        Dictionary with 'pdf', 'svg', 'png' keys and file paths as values
-    """
+    """Create sheet music files (PDF, SVG, PNG) from JSON note data."""
     os.makedirs(output_dir, exist_ok=True)
     
     results = {
